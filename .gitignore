@@ -1,0 +1,29 @@
+# Python virtual environment (Isaac Sim lives here — tens of GB, never commit)
+.venv/
+env_isaaclab/
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Isaac Sim / Omniverse local artifacts
+*.log
+kit/logs/
+*.usd.bak
+
+# Collected data / trajectories (keep pointers, not raw dumps)
+data/**/*.mp4
+data/**/*.npz
+data/**/*.hdf5
+
+# OS / editor cruft
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+
+# Produced ouputs
+sim/scenes/_output/
