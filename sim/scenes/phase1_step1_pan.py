@@ -101,24 +101,57 @@ drive.CreateTargetPositionAttr(0.0)
 
 log("built base + pan joint + drive")
 
+# --- Tilt link + joint + drive (mounted on the PAN link - the chain) ----------------------
+tilt = UsdGeom.Cube.Define(stage, "/World/Turret/tilt") # make a cube prim
+tilt.CreateSizeAttr(1.0)                                # set its size attr
+xf_t = UsdGeom.Xformable(tilt)                          # make it movable
+xf_t.AddTranslateOp().Set(Gf.Vec3d(0, 0.45, 0.50))      # place it (a post above the bar)
+xf_t.AddScaleOp().Set(Gf.Vec3f(0.10, 0.10, 0.4))        # stretch to a thin post
+UsdPhysics.CollisionAPI.Apply(tilt.GetPrim())
+UsdPhysics.RigidBodyAPI.Apply(tilt.GetPrim())
+
+tilt_joint = UsdPhysics.RevoluteJoint.Define(stage, "/World/Turret/tilt_joint")
+tilt_joint.CreateBody0Rel().SetTargets([pan.GetPrim().GetPath()])   # Parent based on Pan  
+tilt_joint.CreateBody1Rel().SetTargets([tilt.GetPrim().GetPath()])  # Pan Points at tilt  
+tilt_joint.CreateAxisAttr("X")                                      # About the Y axis
+tilt_joint.CreateLocalPos0Attr(Gf.Vec3f(0, 0.25, 0.0))              # Pivot in pan frame
+tilt_joint.CreateLocalPos1Attr(Gf.Vec3f(0, 0.0, -0.20))             # Pivot for Tilts Frame
+tilt_joint.CreateLowerLimitAttr(float(cfg.TILT_RANGE_DEG[0]))       # Lower Limit Tilt Range
+tilt_joint.CreateUpperLimitAttr(float(cfg.TILT_RANGE_DEG[1]))       # Upper limit Tilt Range
+
+tilt_drive = UsdPhysics.DriveAPI.Apply(tilt_joint.GetPrim(), "angular") # The Servo
+tilt_drive.CreateTypeAttr("force")
+tilt_drive.CreateStiffnessAttr(1e6)
+tilt_drive.CreateDampingAttr(1e5)
+tilt_drive.CreateTargetPositionAttr(0.0)
+
+
 # --- Simulate ------------------------------------------------------------------------------
 world.reset()  # initialize physics + the articulation
-
+2
 # Wrap the articulation so we can command/read joints from Python.
 art = SingleArticulation("/World/Turret")
 art.initialize()
 log(f"articulation dof names: {art.dof_names}")
 
-target_deg = 45.0
-art.apply_action(ArticulationAction(joint_positions=np.array([math.radians(target_deg)])))
-log(f"commanded pan -> {target_deg} deg; stepping physics...")
+pan_target_deg = 30.0
+tilt_target_deg = 45.0
+targets = np.array([
+    math.radians(pan_target_deg),
+    math.radians(tilt_target_deg),
+])
 
-for _ in range(180):  # ~3 s at 60 Hz — plenty for the drive to settle
+art.apply_action(ArticulationAction(joint_positions=targets))
+log(f"commanded pan->{pan_target_deg}, tilt->{tilt_target_deg}")
+
+for _ in range(180):
     world.step(render=False)
 
-reached_rad = float(art.get_joint_positions()[0])
-reached_deg = math.degrees(reached_rad)
-log(f"pan angle after settle: {reached_deg:.2f} deg (target {target_deg})")
+reached = art.get_joint_positions()
+log(f"dof_names: {art.dof_names}")
+log(f"reached pan={math.degrees(reached[0]):.2f}, "
+    f"tilt={math.degrees(reached[1]):.2f}")
+
 log("done; closing app")
 
 sim_app.close()
